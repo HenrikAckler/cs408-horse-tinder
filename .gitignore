@@ -1,2 +1,5 @@
 *.pem
 .env
+
+# dir for AI information junk
+ai_sources
