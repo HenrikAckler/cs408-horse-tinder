@@ -8,13 +8,55 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <style>
+    body {
+      min-height: 100vh;
+      color: white;
+      background-image: linear-gradient(#14202a55, #14202a55), url("{{ url_for('static', filename='images/horse-title-panorama.svg') }}");
+      background-size: auto, auto 100vh;
+      background-repeat: no-repeat, repeat-x;
+      background-position: center, 0 0;
+      animation: panorama-pan 180s linear infinite;
+      text-shadow: 0 2px 5px #17202acc;
+    }
+    .splash {
+      position: absolute;
+      top: calc(100% - 40px);
+      left: 100%;
+      width: max-content;
+      color: #ffff55;
+      font-size: clamp(1rem, 1.6vw, 1.75rem);
+      font-weight: 800;
+      text-shadow: 2px 3px 0 #493b23, 0 0 12px #312a1c;
+      transform: translateX(-50%) rotate(-16deg);
+      transform-origin: top center;
+      animation: bob 1.8s ease-in-out infinite alternate;
+    }
+    .hero-title {
+      position: relative;
+      font-size: clamp(4rem, 6vw, 7rem);
+      transform: translateY(-1.5rem);
+    }
+    .hero-welcome { margin-top: -2rem !important; }
+    .dependencies-link { margin-top: 3.5rem; }
+    .app-status { margin-top: 2.5rem !important; }
+    @keyframes bob {
+      to { transform: translateX(-50%) rotate(-14deg) scale(1.025); }
+    }
+    @keyframes panorama-pan {
+      to { background-position: center, -237.037vh 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body, .splash { animation: none; }
+    }
+  </style>
 </head>
-<body class="bg-light">
-  <main class="container min-vh-100 d-flex flex-column justify-content-center align-items-center text-center py-5" x-data="{ ready: true }">
-    <h1 class="display-3 fw-bold">Hello, World!</h1>
-    <p class="lead">Welcome to Horse Tinder.</p>
-    <a class="btn btn-primary" href="{{ url_for('dependencies') }}">Check dependencies</a>
-    <p class="mt-3 text-secondary" x-show="ready" x-cloak>Flask and Jinja are running.</p>
+<body>
+  <main class="container position-relative min-vh-100 d-flex flex-column justify-content-center align-items-center text-center py-5" x-data="{ ready: true }">
+    <h1 class="display-3 fw-bold hero-title">Hello, World!<span class="splash">Now with Checkpoint 1!</span></h1>
+    <p class="lead hero-welcome">Welcome to Horse Tinder.</p>
+    <a class="btn btn-primary dependencies-link" href="{{ url_for('dependencies') }}">Check dependencies</a>
+    <p class="text-secondary app-status" x-show="ready" x-cloak>Flask and Jinja are running.</p>
   </main>
 </body>
 </html>
