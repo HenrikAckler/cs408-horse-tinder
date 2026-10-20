@@ -1,5 +1,41 @@
-*.pem
+# Local configuration and credentials
 .env
+.env.*
+!.env.example
+.flaskenv
+.netrc
+.npmrc
+.pypirc
+credentials
+credentials.*
+secrets/
+secrets.*
+*_secret_key
+*.pem
+*.key
+*.p12
+*.pfx
+*.ppk
+*.jks
+*.keystore
+id_rsa
+id_ed25519
+.aws/
+.ssh/
+
+# Local runtime state and databases (may contain account or session data)
+instance/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Python environments and generated files
+.venv/
+__pycache__/
+*.py[cod]
 
 # dir for AI information junk
 ai_sources

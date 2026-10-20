@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Log in | Horse Tinder{% endblock %}
+{% block content %}
+<section class="page-card card border-0 shadow-sm">
+  <div class="card-body p-4 p-md-5">
+    <h1 class="h2">Welcome back</h1>
+    <p class="text-secondary">Log in to view and update your profile.</p>
+    <form method="post" action="{{ url_for('login_submit') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next or '' }}">
+      <div class="mb-3">
+        <label for="username" class="form-label">Username</label>
+        <input id="username" name="username" class="form-control" value="{{ username|default('') }}" maxlength="32" autocomplete="username" required autofocus>
+      </div>
+      <div class="mb-4">
+        <label for="password" class="form-label">Password</label>
+        <input id="password" name="password" type="password" class="form-control" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Log in</button>
+      <a class="btn btn-link" href="{{ url_for('register') }}">Create an account</a>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -21,6 +21,13 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-p
 install -d -o "$APP_USER" -g "$APP_USER" "$APP_DIR" "$APP_DIR/instance"
 install -m 0644 "$DEPLOY_DIR/horse-tinder.service" /etc/systemd/system/horse-tinder.service
 
+# Keep a stable signing secret across restarts and repeated setup runs.
+if [[ ! -s /etc/horse-tinder.env ]]; then
+  python3 -c 'import secrets; from pathlib import Path; Path("/etc/horse-tinder.env").write_text("SECRET_KEY=" + secrets.token_urlsafe(48) + "\n")'
+fi
+chown root:"$APP_USER" /etc/horse-tinder.env
+chmod 0640 /etc/horse-tinder.env
+
 cat > /etc/nginx/sites-available/horse-tinder <<'NGINX'
 server {
     listen 80 default_server;

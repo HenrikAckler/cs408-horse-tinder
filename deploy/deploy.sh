@@ -34,7 +34,7 @@ rsync -az --delete \
   --exclude 'instance/' --exclude '.env' --exclude '*.pem' \
   -e "$RSYNC_RSH" "$ROOT_DIR/" "ubuntu@${HOST}:horse-tinder-upload/"
 
-"${SSH[@]}" "ubuntu@${HOST}" 'sudo rsync -a --delete --exclude instance/ --exclude .venv/ ~/horse-tinder-upload/ /opt/horse-tinder/ && sudo chown -R ubuntu:ubuntu /opt/horse-tinder && cd /opt/horse-tinder && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/python -c "from app import initialize_database; initialize_database()" && sudo systemctl restart horse-tinder.service'
+"${SSH[@]}" "ubuntu@${HOST}" 'sudo rsync -a --delete --exclude instance/ --exclude .venv/ ~/horse-tinder-upload/ /opt/horse-tinder/ && sudo chown -R ubuntu:ubuntu /opt/horse-tinder && cd /opt/horse-tinder && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && set -a && . /etc/horse-tinder.env && set +a && .venv/bin/python -c "from app import initialize_database; initialize_database()" && sudo systemctl restart horse-tinder.service'
 
 echo "Checking deployed app at http://${HOST}/api/health ..."
 for attempt in {1..12}; do

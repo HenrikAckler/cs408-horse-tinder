@@ -9,6 +9,7 @@ Group=ubuntu
 WorkingDirectory=/opt/horse-tinder
 Environment=PYTHONUNBUFFERED=1
 Environment=HORSE_TINDER_DATABASE=/opt/horse-tinder/instance/horse_tinder.db
+EnvironmentFile=/etc/horse-tinder.env
 ExecStart=/opt/horse-tinder/.venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
 Restart=on-failure
 RestartSec=3

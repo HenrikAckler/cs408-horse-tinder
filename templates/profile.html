@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}My profile | Horse Tinder{% endblock %}
+{% block content %}
+{% set values = form_values or {} %}
+<section class="page-card card border-0 shadow-sm">
+  <div class="card-body p-4 p-md-5">
+    <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
+      <div>
+        <h1 class="h2 mb-1">My profile</h1>
+        <p class="text-secondary mb-0">Signed in as <strong>{{ profile['username'] }}</strong></p>
+      </div>
+      {% if profile['pfp'] %}
+        <img src="{{ profile['pfp'] }}" alt="Profile picture" class="rounded-circle object-fit-cover border" width="72" height="72">
+      {% else %}
+        <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center text-secondary" style="width:72px;height:72px" aria-hidden="true">♞</div>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('profile') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label for="display_name" class="form-label">Display name</label>
+        <input id="display_name" name="display_name" class="form-control" value="{{ values.get('display_name', profile['display_name'] or '') }}" maxlength="80" autocomplete="name">
+        <div class="form-text">Your account username stays {{ profile['username'] }}.</div>
+      </div>
+      <div class="row">
+        <div class="col-md-8 mb-3">
+          <label for="breed" class="form-label">Breed / kind</label>
+          <input id="breed" name="breed" class="form-control" value="{{ values.get('breed', profile['breed'] or '') }}" maxlength="80" placeholder="Quarter horse, Arabian, human…">
+        </div>
+        <div class="col-md-4 mb-3">
+          <label for="age" class="form-label">Age</label>
+          <input id="age" name="age" type="number" class="form-control" value="{{ values.get('age', profile['age'] if profile['age'] is not none else '') }}" min="0" max="200" step="1">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label for="interests" class="form-label">Interests</label>
+        <textarea id="interests" name="interests" class="form-control" rows="4" maxlength="2000" placeholder="Tell us what you enjoy">{{ values.get('interests', profile['interests'] or '') }}</textarea>
+        <div class="form-text">Up to 2,000 characters.</div>
+      </div>
+      <div class="mb-4">
+        <label for="pfp" class="form-label">Profile picture URL <span class="text-secondary">(optional)</span></label>
+        <input id="pfp" name="pfp" type="url" class="form-control" value="{{ values.get('pfp', profile['pfp'] or '') }}" maxlength="2048" placeholder="https://example.com/photo.jpg">
+        <div class="form-text">Use an image URL beginning with https:// or http://.</div>
+      </div>
+      <button class="btn btn-primary" type="submit">Save profile</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
