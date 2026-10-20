@@ -24,38 +24,14 @@ For local development, the app creates a persistent, private session key beside 
 
 ## EC2 setup and deployment
 
-These commands use the current instance hostname and key path. Run the laptop commands in a terminal on your Debian machine, from the repository root. The `-h` argument is only the hostname: the deploy script supplies the `ubuntu@` login itself.
-
-### One-time server setup
-
-First copy the setup files from your laptop to the server:
+Create an Ubuntu EC2 instance with SSH access and configure its security group to allow inbound SSH on port 22 and HTTP on port 80. From the repository root on your laptop, deploy with:
 
 ```bash
-scp -i "$HOME/.ssh/henrikackler-cs408-k1.pem" -r deploy ubuntu@ec2-34-221-30-167.us-west-2.compute.amazonaws.com:~
+HOST="your-instance-public-dns-or-ip"
+KEY="$HOME/.ssh/henrikackler-cs408-k1.pem"
+./deploy/deploy.sh -h "$HOST" -i "$KEY"
 ```
 
-Connect to the server:
+The first run automatically installs the server runtime and Nginx, creates a persistent session key, configures the systemd service, uploads the app, initializes its database, and checks `/api/health`. Later runs reuse the setup and deploy the latest code. The session key stays on the server and is not copied from your laptop.
 
-```bash
-ssh -i "$HOME/.ssh/henrikackler-cs408-k1.pem" ubuntu@ec2-34-221-30-167.us-west-2.compute.amazonaws.com
-```
-
-Now you are in a shell on the EC2 instance. Run the setup script there:
-
-```bash
-sudo bash deploy/setup-ec2.sh
-```
-
-When setup finishes, leave the EC2 shell with `exit` to return to your laptop terminal.
-
-### Deploy the app
-
-From the repository root on your laptop, run:
-
-```bash
-./deploy/deploy.sh -h ec2-34-221-30-167.us-west-2.compute.amazonaws.com -i "$HOME/.ssh/henrikackler-cs408-k1.pem"
-```
-
-The script copies the app to EC2, installs its Python requirements, restarts the systemd service, and checks `/api/health`. When it reports success, open http://ec2-34-221-30-167.us-west-2.compute.amazonaws.com/ in a browser. The EC2 security group must allow inbound SSH on port 22 and HTTP on port 80.
-
-If the instance is stopped and started, AWS may assign it a new public hostname. Replace the hostname in these commands and the browser URL with the instance's current public DNS name. Keep `ubuntu@` in the `scp` and `ssh` commands; omit it from the deploy script's `-h` value.
+When deployment succeeds, open `http://<current EC2 public DNS name or IP>/`. If the instance is stopped and started, AWS may assign it a new public address; use the current address for the next deploy.

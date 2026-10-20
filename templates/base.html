@@ -10,10 +10,56 @@
     .navbar-brand { font-weight: 750; letter-spacing: -.03em; }
     .page-card { max-width: 720px; margin-inline: auto; }
     .horse-mark { color: #946b35; }
+    .landing-body {
+      color: white;
+      background-image: linear-gradient(#14202a55, #14202a55), url("{{ url_for('static', filename='images/horse-title-panorama.svg') }}");
+      background-size: auto, auto 100vh;
+      background-repeat: no-repeat, repeat-x;
+      background-position: center, 0 0;
+      animation: panorama-pan 180s linear infinite;
+      text-shadow: 0 2px 5px #17202acc;
+    }
+    .landing-body .navbar { background-color: #17212ddd !important; }
+    .landing-main {
+      min-height: calc(100vh - 56px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .landing-hero { max-width: none; background: transparent; box-shadow: none !important; }
+    .hero-title {
+      position: relative;
+      font-size: clamp(4rem, 6vw, 7rem);
+      transform: translateY(-1.5rem);
+    }
+    .splash {
+      position: absolute;
+      top: calc(100% - 40px);
+      left: 100%;
+      width: max-content;
+      color: #ffff55;
+      font-size: clamp(1rem, 1.6vw, 1.75rem);
+      font-weight: 800;
+      text-shadow: 2px 3px 0 #493b23, 0 0 12px #312a1c;
+      transform: translateX(-50%) rotate(-16deg);
+      transform-origin: top center;
+      animation: bob 1.8s ease-in-out infinite alternate;
+    }
+    .hero-welcome { margin-top: -2rem !important; }
+    @keyframes bob {
+      to { transform: translateX(-50%) rotate(-14deg) scale(1.025); }
+    }
+    @keyframes panorama-pan {
+      to { background-position: center, -237.037vh 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .landing-body, .splash { animation: none; }
+    }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
     <div class="container">
       <a class="navbar-brand" href="{{ url_for('index') }}">Horse Tinder <span class="horse-mark">♞</span></a>
@@ -32,7 +78,7 @@
       </div>
     </div>
   </nav>
-  <main class="container py-5">
+  <main class="container py-5 {% block main_class %}{% endblock %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="page-card mb-4" aria-live="polite">

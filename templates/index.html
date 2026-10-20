@@ -1,18 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Welcome | Horse Tinder{% endblock %}
+{% block body_class %}landing-body{% endblock %}
+{% block main_class %}landing-main{% endblock %}
 {% block content %}
-<section class="page-card text-center py-5 px-4 bg-white rounded-4 shadow-sm">
-  <p class="text-uppercase small fw-semibold text-secondary mb-2">Find your dream horse</p>
-  <h1 class="display-5 fw-bold">A profile for every kind of horse person.</h1>
-  <p class="lead text-secondary mt-3">Create an account and tell the Horse Tinder community a little about yourself.</p>
+<section class="page-card landing-hero text-center py-5 px-4">
+  <h1 class="display-3 fw-bold hero-title">Hello, Horsey!<span class="splash">Now with Checkpoint 2!</span></h1>
+  <p class="lead hero-welcome">Welcome to Horse Tinder.</p>
+  <p class="lead mt-4">Create an account and tell the Horse Tinder community a little about yourself.</p>
   {% if current_user %}
     <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('profile') }}">View my profile</a>
   {% else %}
     <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
       <a class="btn btn-primary btn-lg" href="{{ url_for('register') }}">Create an account</a>
-      <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('login') }}">Log in</a>
+      <a class="btn btn-light btn-lg" href="{{ url_for('login') }}">Log in</a>
     </div>
   {% endif %}
-  <p class="mt-4 mb-0"><a href="{{ url_for('dependencies') }}">Check app dependencies</a></p>
+  <p class="mt-4 mb-0"><a class="link-light" href="{{ url_for('dependencies') }}">Check app dependencies</a></p>
 </section>
 {% endblock %}
