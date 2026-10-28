@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Find a horse | Horse Tinder{% endblock %}
+{% block content %}
+<section class="page-card">
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h2 mb-1">Find your horse</h1>
+      <p class="text-secondary mb-0">{{ remaining }} horse{{ '' if remaining == 1 else 's' }} left with these filters.</p>
+    </div>
+  </div>
+  <form method="get" action="{{ url_for('matching') }}" class="card card-body border-0 shadow-sm mb-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label for="breed" class="form-label">Breed</label>
+        <select id="breed" name="breed" class="form-select">
+          <option value="">All breeds</option>
+          {% for option in breeds %}
+            <option value="{{ option['breed'] }}" {% if breed == option['breed'] %}selected{% endif %}>{{ option['breed'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label for="min_age" class="form-label">Min age</label>
+        <input id="min_age" name="min_age" class="form-control" type="number" min="0" max="80" value="{{ min_age }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label for="max_age" class="form-label">Max age</label>
+        <input id="max_age" name="max_age" class="form-control" type="number" min="0" max="80" value="{{ max_age }}">
+      </div>
+      <div class="col-md-3 d-flex gap-2">
+        <button class="btn btn-primary flex-grow-1" type="submit">Apply filters</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('matching') }}">Clear</a>
+      </div>
+    </div>
+  </form>
+
+  {% if horse %}
+    <article class="card border-0 shadow-sm overflow-hidden">
+      {% if horse['pfp'] %}
+        <img src="{{ horse['pfp'] }}" class="card-img-top" alt="{{ horse['name'] }}" style="max-height:360px;object-fit:cover">
+      {% else %}
+        <div class="d-flex align-items-center justify-content-center bg-light text-secondary" style="height:220px;font-size:5rem" aria-label="No photo available">♞</div>
+      {% endif %}
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+          <div>
+            <h2 class="h3 mb-1">{{ horse['name'] }}</h2>
+            <p class="text-secondary">{{ horse['breed'] }} · {{ horse['age'] }} years old</p>
+          </div>
+          <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="{{ url_for('horse_profile_placeholder', horse_id=horse['horse_id']) }}">Profile</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('horse_chat_placeholder', horse_id=horse['horse_id']) }}">Chat</a>
+          </div>
+        </div>
+        <p class="mb-4"><strong>Interests:</strong> {{ horse['interests'] }}</p>
+        <form method="post" action="{{ url_for('save_swipe') }}" class="d-flex justify-content-center gap-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="horse_id" value="{{ horse['horse_id'] }}">
+          <input type="hidden" name="breed" value="{{ breed }}">
+          <input type="hidden" name="min_age" value="{{ min_age }}">
+          <input type="hidden" name="max_age" value="{{ max_age }}">
+          <button class="btn btn-outline-danger btn-lg px-5" name="decision" value="left" type="submit" aria-label="Pass on {{ horse['name'] }}">Pass</button>
+          <button class="btn btn-success btn-lg px-5" name="decision" value="right" type="submit" aria-label="Like {{ horse['name'] }}">Like</button>
+        </form>
+      </div>
+    </article>
+  {% else %}
+    <div class="card card-body border-0 shadow-sm text-center py-5">
+      {% if all_remaining == 0 %}
+        <h2 class="h4">You reviewed every horse</h2>
+        <p class="text-secondary">Your left and right swipes are saved for your account.</p>
+      {% else %}
+        <h2 class="h4">No horses match these filters</h2>
+        <p class="text-secondary">Clear or widen the filters to see more horses. Your saved swipes are remembered.</p>
+      {% endif %}
+      <div><a class="btn btn-primary" href="{{ url_for('matching') }}">Show available horses</a></div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

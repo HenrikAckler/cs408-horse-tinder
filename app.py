@@ -27,6 +27,14 @@ DATABASE = Path(os.environ.get("HORSE_TINDER_DATABASE", ROOT / "instance/horse_t
 SCHEMA = ROOT / "schema.sql"
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
 MAX_PASSWORD_BYTES = 72  # bcrypt's portable input limit
+SAMPLE_HORSES = (
+    (1, "Muffin", "Shetland Pony", 8, "Carrots, small jumps, naps", None),
+    (2, "Dusty", "Quarter Horse", 11, "Trail rides, sunny fields", None),
+    (3, "Juniper", "Arabian", 6, "Long walks, apples, attention", None),
+    (4, "Pickles", "Appaloosa", 9, "Rolling in grass, making friends", None),
+    (5, "Clover", "Morgan", 5, "Learning tricks, crunchy treats", None),
+    (6, "Thunder", "Mustang", 14, "Open pastures, quiet company", None),
+)
 
 app = Flask(__name__)
 app.config.update(
@@ -78,13 +86,20 @@ def get_db():
 
 
 def initialize_database():
-    """Create database tables when needed without discarding existing data."""
+    """Create tables and insert sample horses without resetting saved data."""
     DATABASE.parent.mkdir(parents=True, exist_ok=True)
     with get_db() as connection:
         connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+        connection.executemany(
+            """INSERT OR IGNORE INTO horses
+               (horse_id, name, breed, age, interests, pfp)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            SAMPLE_HORSES,
+        )
 
 
 def get_user_by_id(user_id):
+    """Return the public account fields used by navigation, if it exists."""
     with get_db() as connection:
         return connection.execute(
             "SELECT user_id, username FROM users WHERE user_id = ?", (user_id,)
@@ -96,7 +111,7 @@ def login_required(view):
     def wrapped_view(**kwargs):
         if not session.get("user_id") or get_user_by_id(session["user_id"]) is None:
             session.clear()
-            flash("Please log in to view your profile.", "warning")
+            flash("Please log in to continue.", "warning")
             return redirect(url_for("login", next=request.path))
         return view(**kwargs)
 
@@ -127,18 +142,21 @@ def inject_current_user():
 
 @app.get("/")
 def index():
+    """Render the public landing page."""
     return render_template("index.html")
 
 
 @app.get("/register")
 def register():
+    """Show the account form, redirecting signed-in users to matching."""
     if session.get("user_id") and get_user_by_id(session["user_id"]):
-        return redirect(url_for("profile"))
+        return redirect(url_for("matching"))
     return render_template("register.html")
 
 
 @app.post("/register")
 def register_submit():
+    """Validate credentials, create an account, and start its session."""
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
     confirm_password = request.form.get("confirm_password", "")
@@ -169,18 +187,20 @@ def register_submit():
     session.clear()
     session["user_id"] = user_id
     flash("Your account is ready. Add a few details to your profile.", "success")
-    return redirect(url_for("profile"))
+    return redirect(url_for("matching"))
 
 
 @app.get("/login")
 def login():
+    """Show the login form and preserve a safe local destination."""
     if session.get("user_id") and get_user_by_id(session["user_id"]):
-        return redirect(url_for("profile"))
+        return redirect(url_for("matching"))
     return render_template("login.html", next=valid_local_redirect(request.args.get("next")))
 
 
 @app.post("/login")
 def login_submit():
+    """Check credentials and begin a signed-in session."""
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
     with get_db() as connection:
@@ -200,11 +220,12 @@ def login_submit():
     session["user_id"] = user["user_id"]
     flash("You are signed in.", "success")
     destination = valid_local_redirect(request.form.get("next"))
-    return redirect(destination or url_for("profile"))
+    return redirect(destination or url_for("matching"))
 
 
 @app.post("/logout")
 def logout():
+    """Clear the signed-in session."""
     session.clear()
     flash("You have been signed out.", "info")
     return redirect(url_for("index"))
@@ -213,6 +234,7 @@ def logout():
 @app.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
+    """Display or update only the profile owned by the signed-in account."""
     user_id = session["user_id"]
     if request.method == "POST":
         display_name = request.form.get("display_name", "").strip()
@@ -252,6 +274,7 @@ def profile():
 
 
 def _render_profile(user_id, status=200, form_values=None):
+    """Load and render one profile, preserving invalid submitted form values."""
     with get_db() as connection:
         data = connection.execute(
             """SELECT users.username, profiles.display_name, profiles.pfp,
@@ -265,13 +288,127 @@ def _render_profile(user_id, status=200, form_values=None):
     return render_template("profile.html", profile=data, form_values=form_values), status
 
 
+@app.get("/matching")
+@login_required
+def matching():
+    """Show the next horse the signed-in user has not swiped on."""
+    breed = request.args.get("breed", "").strip()
+    min_age = _optional_age_filter("min_age")
+    max_age = _optional_age_filter("max_age")
+    min_age_input = request.args.get("min_age", "")
+    max_age_input = request.args.get("max_age", "")
+    if min_age is None and request.args.get("min_age", "").strip():
+        min_age = 0
+        flash("Minimum age must be a number from 0 to 80.", "warning")
+    if max_age is None and request.args.get("max_age", "").strip():
+        max_age = 80
+        flash("Maximum age must be a number from 0 to 80.", "warning")
+    if min_age is not None and max_age is not None and min_age > max_age:
+        min_age, max_age = max_age, min_age
+        min_age_input, max_age_input = str(min_age), str(max_age)
+        flash("The age range was reversed, so it has been corrected.", "info")
+
+    conditions = ["NOT EXISTS (SELECT 1 FROM swipes WHERE swipes.horse_id = horses.horse_id AND swipes.user_id = ?)"]
+    values = [session["user_id"]]
+    if breed:
+        conditions.append("breed = ?")
+        values.append(breed)
+    if min_age is not None:
+        conditions.append("age >= ?")
+        values.append(min_age)
+    if max_age is not None:
+        conditions.append("age <= ?")
+        values.append(max_age)
+
+    with get_db() as connection:
+        horse = connection.execute(
+            "SELECT * FROM horses WHERE " + " AND ".join(conditions) + " ORDER BY horse_id LIMIT 1",
+            values,
+        ).fetchone()
+        breeds = connection.execute("SELECT DISTINCT breed FROM horses ORDER BY breed").fetchall()
+        remaining = connection.execute(
+            "SELECT COUNT(*) FROM horses WHERE " + " AND ".join(conditions), values,
+        ).fetchone()[0]
+        all_remaining = connection.execute(
+            """SELECT COUNT(*) FROM horses
+               WHERE NOT EXISTS (SELECT 1 FROM swipes WHERE swipes.horse_id = horses.horse_id AND swipes.user_id = ?)""",
+            (session["user_id"],),
+        ).fetchone()[0]
+    return render_template(
+        "matching.html", horse=horse, breeds=breeds, breed=breed,
+        min_age=min_age_input, max_age=max_age_input,
+        remaining=remaining, all_remaining=all_remaining,
+    )
+
+
+def _optional_age_filter(field):
+    """Return a valid optional horse age filter, or None when blank/invalid."""
+    raw_value = request.args.get(field, "").strip()
+    if not raw_value:
+        return None
+    try:
+        age = int(raw_value)
+    except ValueError:
+        return None
+    return age if 0 <= age <= 80 else None
+
+
+@app.post("/matching/swipe")
+@login_required
+def save_swipe():
+    """Save a left/right decision, then return to the same filtered deck."""
+    horse_id = request.form.get("horse_id", type=int)
+    decision = request.form.get("decision", "")
+    if horse_id is None or decision not in {"left", "right"}:
+        abort(400)
+    try:
+        with get_db() as connection:
+            connection.execute(
+                "INSERT INTO swipes (user_id, horse_id, decision) VALUES (?, ?, ?)",
+                (session["user_id"], horse_id, decision),
+            )
+    except sqlite3.IntegrityError:
+        # A repeated submission is harmless; the unique key preserves the first choice.
+        flash("You have already swiped on that horse.", "info")
+    else:
+        flash("You liked this horse!" if decision == "right" else "Horse skipped.", "success" if decision == "right" else "info")
+    return redirect(url_for(
+        "matching", breed=request.form.get("breed", ""),
+        min_age=request.form.get("min_age", ""), max_age=request.form.get("max_age", ""),
+    ))
+
+
+@app.get("/checkpoint4/horse/<int:horse_id>")
+@login_required
+def horse_profile_placeholder(horse_id):
+    """Provide a destination until read-only horse profiles arrive in checkpoint 4."""
+    with get_db() as connection:
+        horse = connection.execute("SELECT name FROM horses WHERE horse_id = ?", (horse_id,)).fetchone()
+    if horse is None:
+        abort(404)
+    return render_template("coming_soon.html", feature=f"{horse['name']}'s profile")
+
+
+@app.get("/checkpoint4/chat/<int:horse_id>")
+@login_required
+def horse_chat_placeholder(horse_id):
+    """Provide a destination until horse chats arrive in checkpoint 4."""
+    with get_db() as connection:
+        horse = connection.execute("SELECT name FROM horses WHERE horse_id = ?", (horse_id,)).fetchone()
+    if horse is None:
+        abort(404)
+    return render_template("coming_soon.html", feature=f"Chat with {horse['name']}")
+
+
 @app.get("/dependencies")
 def dependencies():
+    """Render the page that reports selected app dependencies."""
     return render_template("dependencies.html")
 
 
 @app.get("/api/health")
 def health():
+    """Return the lightweight status response used by deployment checks."""
     return {"status": "ok"}, 200
 
 

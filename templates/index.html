@@ -4,11 +4,11 @@
 {% block main_class %}landing-main{% endblock %}
 {% block content %}
 <section class="page-card landing-hero text-center py-5 px-4">
-  <h1 class="display-3 fw-bold hero-title">Hello, Horsey!<span class="splash">Now with Checkpoint 2!</span></h1>
+  <h1 class="display-3 fw-bold hero-title">Hello, Horsey!<span class="splash">Now with matching!</span></h1>
   <p class="lead hero-welcome">Welcome to Horse Tinder.</p>
   <p class="lead mt-4">Create an account and tell the Horse Tinder community a little about yourself.</p>
   {% if current_user %}
-    <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('profile') }}">View my profile</a>
+    <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('matching') }}">Find a horse</a>
   {% else %}
     <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
       <a class="btn btn-primary btn-lg" href="{{ url_for('register') }}">Create an account</a>

@@ -66,6 +66,7 @@
       <div class="d-flex align-items-center gap-2">
         {% if current_user %}
           <span class="navbar-text d-none d-sm-inline">Signed in as {{ current_user['username'] }}</span>
+          <a class="btn btn-outline-light btn-sm" href="{{ url_for('matching') }}">Matching</a>
           <a class="btn btn-outline-light btn-sm" href="{{ url_for('profile') }}">My profile</a>
           <form method="post" action="{{ url_for('logout') }}" class="m-0">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

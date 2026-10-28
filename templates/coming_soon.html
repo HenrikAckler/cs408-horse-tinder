@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Coming soon | Horse Tinder{% endblock %}
+{% block content %}
+<section class="page-card card border-0 shadow-sm text-center">
+  <div class="card-body p-5">
+    <h1 class="h2">{{ feature }}</h1>
+    <p class="text-secondary">This destination is planned for checkpoint 4.</p>
+    <a class="btn btn-primary" href="{{ url_for('matching') }}">Back to matching</a>
+  </div>
+</section>
+{% endblock %}
