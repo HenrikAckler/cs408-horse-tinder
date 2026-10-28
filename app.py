@@ -130,15 +130,18 @@ def get_db():
 
 
 def initialize_database():
-    """Create tables and insert sample horses without resetting saved data."""
+    """Create tables and idempotently add the sample profiles."""
     DATABASE.parent.mkdir(parents=True, exist_ok=True)
     with get_db() as connection:
         connection.executescript(SCHEMA.read_text(encoding="utf-8"))
         connection.executemany(
-            """INSERT OR IGNORE INTO horses
-               (horse_id, name, breed, age, interests, pfp)
+            """INSERT OR IGNORE INTO profiledata
+               (name, breed, age, interests, pfp, seed_key)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            SAMPLE_HORSES,
+            [
+                (name, breed, age, interests, pfp, f"sample-profile-{sample_id:02d}")
+                for sample_id, name, breed, age, interests, pfp in SAMPLE_HORSES
+            ],
         )
 
 
@@ -146,7 +149,7 @@ def get_user_by_id(user_id):
     """Return the public account fields used by navigation, if it exists."""
     with get_db() as connection:
         return connection.execute(
-            "SELECT user_id, username FROM users WHERE user_id = ?", (user_id,)
+            "SELECT user_id, username FROM logindata WHERE user_id = ?", (user_id,)
         ).fetchone()
 
 
@@ -219,11 +222,14 @@ def register_submit():
     try:
         with get_db() as connection:
             cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                "INSERT INTO logindata (username, password_hash) VALUES (?, ?)",
                 (username, password_hash),
             )
             user_id = cursor.lastrowid
-            connection.execute("INSERT INTO profiles (user_id) VALUES (?)", (user_id,))
+            connection.execute(
+                "INSERT INTO profiledata (user_id) VALUES (?)",
+                (user_id,),
+            )
     except sqlite3.IntegrityError:
         flash("That username is already in use. Please choose another.", "danger")
         return render_template("register.html", username=username), 400
@@ -249,7 +255,7 @@ def login_submit():
     password = request.form.get("password", "")
     with get_db() as connection:
         user = connection.execute(
-            "SELECT user_id, username, password_hash FROM users WHERE username = ? COLLATE NOCASE",
+            "SELECT user_id, username, password_hash FROM logindata WHERE username = ? COLLATE NOCASE",
             (username,),
         ).fetchone()
 
@@ -306,8 +312,8 @@ def profile():
 
         with get_db() as connection:
             connection.execute(
-                """UPDATE profiles
-                   SET display_name = ?, breed = ?, age = ?, interests = ?, pfp = ?
+                """UPDATE profiledata
+                   SET name = ?, breed = ?, age = ?, interests = ?, pfp = ?
                    WHERE user_id = ?""",
                 (display_name or None, breed or None, age, interests or None, pfp or None, user_id),
             )
@@ -321,10 +327,10 @@ def _render_profile(user_id, status=200, form_values=None):
     """Load and render one profile, preserving invalid submitted form values."""
     with get_db() as connection:
         data = connection.execute(
-            """SELECT users.username, profiles.display_name, profiles.pfp,
-                      profiles.breed, profiles.age, profiles.interests
-               FROM users JOIN profiles USING (user_id)
-               WHERE users.user_id = ?""",
+            """SELECT logindata.username, profiledata.name AS display_name, profiledata.pfp,
+                      profiledata.breed, profiledata.age, profiledata.interests
+               FROM logindata JOIN profiledata USING (user_id)
+               WHERE logindata.user_id = ?""",
             (user_id,),
         ).fetchone()
     if data is None:
@@ -335,7 +341,7 @@ def _render_profile(user_id, status=200, form_values=None):
 @app.get("/matching")
 @login_required
 def matching():
-    """Show the next horse the signed-in user has not swiped on."""
+    """Show the next other profile the signed-in user has not swiped on."""
     breed = request.args.get("breed", "").strip()
     min_age = _optional_age_filter("min_age")
     max_age = _optional_age_filter("max_age")
@@ -343,17 +349,20 @@ def matching():
     max_age_input = request.args.get("max_age", "")
     if min_age is None and request.args.get("min_age", "").strip():
         min_age = 0
-        flash("Minimum age must be a number from 0 to 80.", "warning")
+        flash("Minimum age must be a number from 0 to 200.", "warning")
     if max_age is None and request.args.get("max_age", "").strip():
-        max_age = 80
-        flash("Maximum age must be a number from 0 to 80.", "warning")
+        max_age = 200
+        flash("Maximum age must be a number from 0 to 200.", "warning")
     if min_age is not None and max_age is not None and min_age > max_age:
         min_age, max_age = max_age, min_age
         min_age_input, max_age_input = str(min_age), str(max_age)
         flash("The age range was reversed, so it has been corrected.", "info")
 
-    conditions = ["NOT EXISTS (SELECT 1 FROM swipes WHERE swipes.horse_id = horses.horse_id AND swipes.user_id = ?)"]
-    values = [session["user_id"]]
+    conditions = [
+        "(profiledata.user_id IS NULL OR profiledata.user_id != ?)",
+        "NOT EXISTS (SELECT 1 FROM swipes WHERE swipes.profile_id = profiledata.profile_id AND swipes.user_id = ?)",
+    ]
+    values = [session["user_id"], session["user_id"]]
     if breed:
         conditions.append("breed = ?")
         values.append(breed)
@@ -365,28 +374,38 @@ def matching():
         values.append(max_age)
 
     with get_db() as connection:
-        horse = connection.execute(
-            "SELECT * FROM horses WHERE " + " AND ".join(conditions) + " ORDER BY horse_id LIMIT 1",
+        match_profile = connection.execute(
+            """SELECT profiledata.profile_id, profiledata.user_id, profiledata.pfp,
+                      profiledata.breed, profiledata.age, profiledata.interests,
+                      COALESCE(profiledata.name, logindata.username, 'Unnamed profile') AS display_name
+               FROM profiledata LEFT JOIN logindata USING (user_id)
+               WHERE """
+            + " AND ".join(conditions) + " ORDER BY profile_id LIMIT 1",
             values,
         ).fetchone()
-        breeds = connection.execute("SELECT DISTINCT breed FROM horses ORDER BY breed").fetchall()
+        breeds = connection.execute(
+            """SELECT DISTINCT breed FROM profiledata
+               WHERE (user_id IS NULL OR user_id != ?) AND breed IS NOT NULL ORDER BY breed""",
+            (session["user_id"],),
+        ).fetchall()
         remaining = connection.execute(
-            "SELECT COUNT(*) FROM horses WHERE " + " AND ".join(conditions), values,
+            "SELECT COUNT(*) FROM profiledata WHERE " + " AND ".join(conditions), values,
         ).fetchone()[0]
         all_remaining = connection.execute(
-            """SELECT COUNT(*) FROM horses
-               WHERE NOT EXISTS (SELECT 1 FROM swipes WHERE swipes.horse_id = horses.horse_id AND swipes.user_id = ?)""",
-            (session["user_id"],),
+            """SELECT COUNT(*) FROM profiledata
+               WHERE (user_id IS NULL OR user_id != ?)
+                 AND NOT EXISTS (SELECT 1 FROM swipes WHERE swipes.profile_id = profiledata.profile_id AND swipes.user_id = ?)""",
+            (session["user_id"], session["user_id"]),
         ).fetchone()[0]
     return render_template(
-        "matching.html", horse=horse, breeds=breeds, breed=breed,
+        "matching.html", match_profile=match_profile, breeds=breeds, breed=breed,
         min_age=min_age_input, max_age=max_age_input,
         remaining=remaining, all_remaining=all_remaining,
     )
 
 
 def _optional_age_filter(field):
-    """Return a valid optional horse age filter, or None when blank/invalid."""
+    """Return a valid optional profile age filter, or None when blank/invalid."""
     raw_value = request.args.get(field, "").strip()
     if not raw_value:
         return None
@@ -394,54 +413,64 @@ def _optional_age_filter(field):
         age = int(raw_value)
     except ValueError:
         return None
-    return age if 0 <= age <= 80 else None
+    return age if 0 <= age <= 200 else None
 
 
 @app.post("/matching/swipe")
 @login_required
 def save_swipe():
     """Save a left/right decision, then return to the same filtered deck."""
-    horse_id = request.form.get("horse_id", type=int)
+    profile_id = request.form.get("profile_id", type=int)
     decision = request.form.get("decision") or request.form.get("gesture_decision", "")
-    if horse_id is None or decision not in {"left", "right"}:
+    if profile_id is None or decision not in {"left", "right"}:
         abort(400)
     try:
         with get_db() as connection:
-            connection.execute(
-                "INSERT INTO swipes (user_id, horse_id, decision) VALUES (?, ?, ?)",
-                (session["user_id"], horse_id, decision),
+            cursor = connection.execute(
+                """INSERT INTO swipes (user_id, profile_id, decision)
+                   SELECT ?, profile_id, ? FROM profiledata
+                   WHERE profile_id = ? AND (user_id IS NULL OR user_id != ?)""",
+                (session["user_id"], decision, profile_id, session["user_id"]),
             )
+            if cursor.rowcount == 0:
+                abort(404)
     except sqlite3.IntegrityError:
         # A repeated submission is harmless; the unique key preserves the first choice.
-        flash("You have already swiped on that horse.", "info")
+        flash("You have already swiped on that profile.", "info")
     else:
-        flash("You liked this horse!" if decision == "right" else "Horse skipped.", "success" if decision == "right" else "info")
+        flash("You liked this profile!" if decision == "right" else "Profile skipped.", "success" if decision == "right" else "info")
     return redirect(url_for(
         "matching", breed=request.form.get("breed", ""),
         min_age=request.form.get("min_age", ""), max_age=request.form.get("max_age", ""),
     ))
 
 
-@app.get("/checkpoint4/horse/<int:horse_id>")
+@app.get("/checkpoint4/profile/<int:profile_id>")
 @login_required
-def horse_profile_placeholder(horse_id):
-    """Provide a destination until read-only horse profiles arrive in checkpoint 4."""
+def matched_profile_placeholder(profile_id):
+    """Provide a destination until read-only matched profiles arrive in checkpoint 4."""
     with get_db() as connection:
-        horse = connection.execute("SELECT name FROM horses WHERE horse_id = ?", (horse_id,)).fetchone()
-    if horse is None:
+        profile = connection.execute(
+            "SELECT profiledata.name, logindata.username FROM profiledata LEFT JOIN logindata USING (user_id) WHERE profile_id = ?",
+            (profile_id,),
+        ).fetchone()
+    if profile is None:
         abort(404)
-    return render_template("coming_soon.html", feature=f"{horse['name']}'s profile")
+    return render_template("coming_soon.html", feature=f"{profile['name'] or profile['username'] or 'Profile'}'s profile")
 
 
-@app.get("/checkpoint4/chat/<int:horse_id>")
+@app.get("/checkpoint4/chat/<int:profile_id>")
 @login_required
-def horse_chat_placeholder(horse_id):
-    """Provide a destination until horse chats arrive in checkpoint 4."""
+def matched_profile_chat_placeholder(profile_id):
+    """Provide a destination until matched-profile chats arrive in checkpoint 4."""
     with get_db() as connection:
-        horse = connection.execute("SELECT name FROM horses WHERE horse_id = ?", (horse_id,)).fetchone()
-    if horse is None:
+        profile = connection.execute(
+            "SELECT profiledata.name, logindata.username FROM profiledata LEFT JOIN logindata USING (user_id) WHERE profile_id = ?",
+            (profile_id,),
+        ).fetchone()
+    if profile is None:
         abort(404)
-    return render_template("coming_soon.html", feature=f"Chat with {horse['name']}")
+    return render_template("coming_soon.html", feature=f"Chat with {profile['name'] or profile['username'] or 'this profile'}")
 
 
 @app.get("/dependencies")

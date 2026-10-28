@@ -1,6 +1,6 @@
 # Horse Tinder
 
-A Flask and Jinja Horse Tinder application. Checkpoint 3 includes account registration, login/logout, editable personal profiles, and a matching page with sample horses, filters, and saved left/right swipes. `/dependencies` reports whether the selected frontend libraries are available.
+A Flask and Jinja Horse Tinder application. Checkpoint 3 includes account registration, login/logout, editable personal profiles, and a matching page with sample profiles, filters, and saved left/right swipes. `/dependencies` reports whether the selected frontend libraries are available.
 
 ## Local setup
 
@@ -20,16 +20,15 @@ Open the home page and choose **Create an account** or **Log in**. Registration 
 
 SQLite creates and updates the tables automatically when the app starts. The default database is `instance/horse_tinder.db`; set `HORSE_TINDER_DATABASE` to use another path. The schema is documented in `schema.sql` and below:
 
-- `users` stores the login username and bcrypt password hash.
-- `profiles` stores each account's personal profile; it is linked to `users` by `user_id`.
-- `horses` stores the small, fixed set of sample horses. Startup inserts any missing sample IDs and does not replace existing rows.
-- `swipes` stores each user's left/right decision for a horse. A unique `(user_id, horse_id)` constraint allows one decision per horse for each user; foreign keys remove related swipes if their account or horse is deleted.
+- `logindata` stores each real user's login username and bcrypt password hash.
+- `profiledata` stores all matchable profiles in the same format. Real users have a linked `logindata` row; sample profiles do not. There is no horse/user type field. Breed and profile picture are profile details, and people decide how to interpret them.
+- `swipes` stores each user's left/right decision for another profile. A unique `(user_id, profile_id)` constraint allows one decision per profile for each user; foreign keys remove related swipes if their account or profile is deleted.
 
 ## Matching
 
-After signing up or logging in, open **Matching** to browse 50 sample horses. Filter by breed and optional minimum/maximum age, then swipe left to pass or right to like. You can also use the **Pass** and **Like** buttons. Horizontal gestures use the lightweight Hammer.js library, with Alpine.js connecting the gesture to the existing form. Decisions are saved to SQLite and that horse is removed from your deck for that account. Clearing filters does not clear swipes. Horse profile and chat buttons currently lead to checkpoint 4 placeholders.
+After signing up or logging in, open **Matching** to browse all other profiles, including the 50 sample profiles and other registered users. All profiles use the same fields; breed and picture are up to users to interpret. Filter by breed and optional minimum/maximum age, then swipe left to pass or right to like. You can also use the **Pass** and **Like** buttons. Horizontal gestures use the lightweight Hammer.js library, with Alpine.js connecting the gesture to the existing form. Decisions are saved to SQLite and that profile is removed from your deck for that account. Clearing filters does not clear swipes. Profile and chat buttons currently lead to checkpoint 4 placeholders.
 
-The sample horse records are defined in `app.py` and seeded idempotently when the app initializes. Existing databases gain the `horses` and `swipes` tables on startup without deleting account, profile, or swipe data. See [`docs/checkpoint3.md`](docs/checkpoint3.md) for the implementation notes and database change details.
+The sample profile records are defined in `app.py` and seeded idempotently when the app initializes. The local database was reset for the unified profile schema; create a new account the next time you use the app. See [`docs/checkpoint3.md`](docs/checkpoint3.md) for implementation notes and database details.
 
 For local development, the app creates a persistent, private session key beside the configured database if `SECRET_KEY` is not set. On EC2, `deploy/setup-ec2.sh` creates `/etc/horse-tinder.env` with a stable random `SECRET_KEY`; the systemd service reads it on startup. The setup script preserves an existing file when run again. Keep that file readable only by root and the app's service group, and do not add the key to the repository.
 

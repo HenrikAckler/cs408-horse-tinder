@@ -8,7 +8,7 @@
   <p class="lead hero-welcome">Welcome to Horse Tinder.</p>
   <p class="lead mt-4">Create an account and tell the Horse Tinder community a little about yourself.</p>
   {% if current_user %}
-    <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('matching') }}">Find a horse</a>
+    <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('matching') }}">Find a match</a>
   {% else %}
     <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
       <a class="btn btn-primary btn-lg" href="{{ url_for('register') }}">Create an account</a>

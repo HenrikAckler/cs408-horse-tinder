@@ -1,38 +1,32 @@
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS logindata (
     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL COLLATE NOCASE UNIQUE,
     password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS profiles (
-    user_id INTEGER PRIMARY KEY,
-    display_name TEXT,
+-- Every matchable person/horse has the same profile shape. Login accounts link
+-- to one row; seeded profiles have no login account.
+CREATE TABLE IF NOT EXISTS profiledata (
+    profile_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER UNIQUE,
+    name TEXT,
     pfp TEXT,
     breed TEXT,
     age INTEGER CHECK (age IS NULL OR age BETWEEN 0 AND 200),
     interests TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+    seed_key TEXT UNIQUE,
+    FOREIGN KEY (user_id) REFERENCES logindata(user_id) ON DELETE CASCADE
 );
 
--- Sample horses shown on the matching page. Seeded rows use stable IDs.
-CREATE TABLE IF NOT EXISTS horses (
-    horse_id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    breed TEXT NOT NULL,
-    age INTEGER NOT NULL CHECK (age BETWEEN 0 AND 80),
-    interests TEXT NOT NULL,
-    pfp TEXT
-);
-
--- One saved left/right decision per user and horse.
+-- A login account can swipe on any other profile row.
 CREATE TABLE IF NOT EXISTS swipes (
     swipe_id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    horse_id INTEGER NOT NULL,
+    profile_id INTEGER NOT NULL,
     decision TEXT NOT NULL CHECK (decision IN ('left', 'right')),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (user_id, horse_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (horse_id) REFERENCES horses(horse_id) ON DELETE CASCADE
+    UNIQUE (user_id, profile_id),
+    FOREIGN KEY (user_id) REFERENCES logindata(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES profiledata(profile_id) ON DELETE CASCADE
 );

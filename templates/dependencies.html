@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-card">
   <h1 class="h2">Dependency check</h1>
-  <p>Flask and Jinja rendered this page. SQLite initializes the account, profile, horse, and swipe tables when the app starts.</p>
+  <p>Flask and Jinja rendered this page. SQLite initializes the login, profile, and swipe tables when the app starts.</p>
   <p class="btn-check" hidden></p>
   <ul class="list-group mb-3" x-data="{ libraries: { Bootstrap: false, Tailwind: false, Alpine: false, Hammer: false }, check() { this.libraries.Bootstrap = getComputedStyle(document.querySelector('.btn-check')).position === 'absolute'; this.libraries.Tailwind = !!window.tailwind; this.libraries.Alpine = !!window.Alpine; this.libraries.Hammer = !!window.Hammer; } }" x-init="setTimeout(() => check(), 500)">
     <li class="list-group-item">Flask: loaded</li>
