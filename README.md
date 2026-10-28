@@ -27,7 +27,7 @@ SQLite creates and updates the tables automatically when the app starts. The def
 
 ## Matching
 
-After signing up or logging in, open **Matching** to browse the sample horses. Filter by breed and optional minimum/maximum age, then choose **Pass** or **Like**. Decisions are saved to SQLite and that horse is removed from your deck for that account. Clearing filters does not clear swipes. Horse profile and chat buttons currently lead to checkpoint 4 placeholders.
+After signing up or logging in, open **Matching** to browse 50 sample horses. Filter by breed and optional minimum/maximum age, then swipe left to pass or right to like. You can also use the **Pass** and **Like** buttons. Horizontal gestures use the lightweight Hammer.js library, with Alpine.js connecting the gesture to the existing form. Decisions are saved to SQLite and that horse is removed from your deck for that account. Clearing filters does not clear swipes. Horse profile and chat buttons currently lead to checkpoint 4 placeholders.
 
 The sample horse records are defined in `app.py` and seeded idempotently when the app initializes. Existing databases gain the `horses` and `swipes` tables on startup without deleting account, profile, or swipe data. See [`docs/checkpoint3.md`](docs/checkpoint3.md) for the implementation notes and database change details.
 

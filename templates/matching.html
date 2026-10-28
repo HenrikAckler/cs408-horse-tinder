@@ -35,7 +35,9 @@
   </form>
 
   {% if horse %}
-    <article class="card border-0 shadow-sm overflow-hidden">
+    <article x-data="swipeCard" x-init="init()" x-ref="card"
+             :style="{ transform: 'translateX(' + offset + 'px) rotate(' + (offset / 20) + 'deg)' }"
+             class="card border-0 shadow-sm overflow-hidden swipe-card">
       {% if horse['pfp'] %}
         <img src="{{ horse['pfp'] }}" class="card-img-top" alt="{{ horse['name'] }}" style="max-height:360px;object-fit:cover">
       {% else %}
@@ -53,9 +55,11 @@
           </div>
         </div>
         <p class="mb-4"><strong>Interests:</strong> {{ horse['interests'] }}</p>
-        <form method="post" action="{{ url_for('save_swipe') }}" class="d-flex justify-content-center gap-3">
+        <p class="small text-secondary text-center mb-2">Swipe left to pass or right to like. You can also use the buttons.</p>
+        <form x-ref="form" method="post" action="{{ url_for('save_swipe') }}" class="d-flex justify-content-center gap-3">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="horse_id" value="{{ horse['horse_id'] }}">
+          <input x-ref="gestureDecision" type="hidden" name="gesture_decision" value="">
           <input type="hidden" name="breed" value="{{ breed }}">
           <input type="hidden" name="min_age" value="{{ min_age }}">
           <input type="hidden" name="max_age" value="{{ max_age }}">
@@ -77,4 +81,34 @@
     </div>
   {% endif %}
 </section>
+{% endblock %}
+{% block head %}
+<style>
+  .swipe-card { touch-action: pan-y; transition: transform 120ms ease-out; }
+</style>
+<script defer src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+<script>
+  // Register the small Alpine component before Alpine initializes; Hammer handles horizontal gestures.
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('swipeCard', () => ({
+      offset: 0,
+      init() {
+        if (!window.Hammer) return; // The Like/Pass buttons still work if the CDN is unavailable.
+        const hammer = new Hammer(this.$refs.card);
+        hammer.get('pan').set({ direction: Hammer.DIRECTION_HORIZONTAL, threshold: 10 });
+        hammer.on('panmove', event => { this.offset = event.deltaX; });
+        hammer.on('panend', event => {
+          if (event.deltaX > 120) this.submitSwipe('right');
+          else if (event.deltaX < -120) this.submitSwipe('left');
+          this.offset = 0;
+        });
+      },
+      submitSwipe(decision) {
+        this.$refs.gestureDecision.value = decision;
+        this.$refs.form.requestSubmit();
+      }
+    }));
+  });
+</script>
 {% endblock %}

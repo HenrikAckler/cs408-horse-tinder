@@ -34,6 +34,50 @@ SAMPLE_HORSES = (
     (4, "Pickles", "Appaloosa", 9, "Rolling in grass, making friends", None),
     (5, "Clover", "Morgan", 5, "Learning tricks, crunchy treats", None),
     (6, "Thunder", "Mustang", 14, "Open pastures, quiet company", None),
+    (7, "Biscuit", "Welsh Pony", 7, "Forest trails, grooming, pears", None),
+    (8, "Marigold", "Paint Horse", 10, "Creek splashing, slow mornings", None),
+    (9, "Rocket", "Thoroughbred", 4, "Running fast, sunflower seeds", None),
+    (10, "Bluebell", "Connemara", 12, "Hacking, cuddles, fresh hay", None),
+    (11, "Waffles", "Haflinger", 9, "Carriage rides, beach walks", None),
+    (12, "Poppy", "Tennessee Walker", 13, "Gentle trails, making people smile", None),
+    (13, "Bandit", "Gypsy Vanner", 8, "Long manes, music, carrots", None),
+    (14, "Olive", "Standardbred", 6, "Trotting, apples, quiet friends", None),
+    (15, "Nacho", "Miniature Horse", 5, "Tiny jumps, big snacks", None),
+    (16, "Willow", "Friesian", 11, "Dressage, shiny coats, apples", None),
+    (17, "Pancake", "Clydesdale", 15, "Parades, brushing, naps", None),
+    (18, "Cinnamon", "Mustang", 3, "New adventures, sweet grass", None),
+    (19, "Mochi", "Shetland Pony", 18, "Being adorable, stealing hats", None),
+    (20, "Sundance", "Quarter Horse", 7, "Ranch work, open spaces", None),
+    (21, "Fern", "Morgan", 16, "Quiet companionship, clover", None),
+    (22, "Pretzel", "Appaloosa", 6, "Obstacle courses, rolling", None),
+    (23, "Skittles", "Arabian", 9, "Long rides, singing birds", None),
+    (24, "Doodle", "Welsh Pony", 14, "Teaching kids, snack breaks", None),
+    (25, "Maple", "Paint Horse", 5, "Autumn leaves, trail rides", None),
+    (26, "Socks", "Thoroughbred", 8, "Morning runs, peppermints", None),
+    (27, "Daisy", "Connemara", 4, "Jumping, paddock friends", None),
+    (28, "Gingersnap", "Haflinger", 17, "Cozy blankets, carrots", None),
+    (29, "Comet", "Tennessee Walker", 10, "Night skies, smooth trails", None),
+    (30, "Bramble", "Gypsy Vanner", 13, "Woodland walks, gentle pats", None),
+    (31, "Peaches", "Standardbred", 7, "Peach slices, trotting", None),
+    (32, "Tater Tot", "Miniature Horse", 11, "Tiny adventures, attention", None),
+    (33, "Velvet", "Friesian", 6, "Elegant walks, mane braiding", None),
+    (34, "Big Mac", "Clydesdale", 9, "Pulling carts, friendly waves", None),
+    (35, "Ranger", "Mustang", 19, "Wide open fields, sunsets", None),
+    (36, "Toffee", "Quarter Horse", 2, "Learning new things, treats", None),
+    (37, "Sage", "Morgan", 8, "Easy rides, cool weather", None),
+    (38, "Confetti", "Appaloosa", 12, "Parties, patterned blankets", None),
+    (39, "Starlight", "Arabian", 15, "Moonlit rides, quiet barns", None),
+    (40, "Pebbles", "Shetland Pony", 3, "Puddles, tiny carrots", None),
+    (41, "Rio", "Paint Horse", 16, "River walks, friendly races", None),
+    (42, "Whiskey", "Thoroughbred", 12, "Retirement, soft hay", None),
+    (43, "Luna", "Connemara", 7, "Cross-country, dandelions", None),
+    (44, "Noodle", "Haflinger", 5, "Following friends, snack time", None),
+    (45, "Echo", "Tennessee Walker", 18, "Slow rides, birdsong", None),
+    (46, "Fable", "Gypsy Vanner", 2, "Meeting new friends, apples", None),
+    (47, "Pistachio", "Standardbred", 14, "Easy trots, green grass", None),
+    (48, "Button", "Miniature Horse", 8, "Pocket-sized adventures", None),
+    (49, "Regal", "Friesian", 17, "Gentle dressage, grooming", None),
+    (50, "Huckleberry", "Clydesdale", 4, "Meadow walks, crunchy snacks", None),
 )
 
 app = Flask(__name__)
@@ -358,7 +402,7 @@ def _optional_age_filter(field):
 def save_swipe():
     """Save a left/right decision, then return to the same filtered deck."""
     horse_id = request.form.get("horse_id", type=int)
-    decision = request.form.get("decision", "")
+    decision = request.form.get("decision") or request.form.get("gesture_decision", "")
     if horse_id is None or decision not in {"left", "right"}:
         abort(400)
     try:
