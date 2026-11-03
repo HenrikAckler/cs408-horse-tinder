@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Chats | Horse Tinder{% endblock %}
+{% block content %}
+<section class="page-card">
+  <h1 class="h2 mb-3">Chats</h1>
+  <form method="get" action="{{ url_for('chats') }}" class="input-group mb-4">
+    <label class="visually-hidden" for="chat-search">Search chats</label>
+    <input id="chat-search" name="q" class="form-control" value="{{ search }}" maxlength="100" placeholder="Search profiles and messages">
+    <button class="btn btn-primary" type="submit">Search</button>
+    {% if search %}<a class="btn btn-outline-secondary" href="{{ url_for('chats') }}">Clear</a>{% endif %}
+  </form>
+  {% if chats %}
+    <div class="list-group shadow-sm">
+      {% for item in chats %}
+        <div class="list-group-item d-flex align-items-center gap-3">
+          {% if item['pfp'] %}<img src="{{ item['pfp'] }}" alt="" class="rounded-circle object-fit-cover" width="56" height="56">
+          {% else %}<div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width:56px;height:56px" aria-hidden="true">♞</div>{% endif %}
+          <div class="flex-grow-1 overflow-hidden">
+            <a class="fw-semibold" href="{{ url_for('chat', chat_id=item['chat_id']) }}">{{ item['display_name'] }}</a>
+            <div class="small text-secondary text-truncate">{{ item['last_message'] or 'No messages yet' }}</div>
+          </div>
+          <form method="post" action="{{ url_for('delete_chat', chat_id=item['chat_id']) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card card-body border-0 shadow-sm text-center py-5">
+      <h2 class="h4">{{ 'No chats found' if search else 'No chats yet' }}</h2>
+      <p class="text-secondary mb-3">{{ 'Try a different search.' if search else 'Open a profile from matching to start a conversation.' }}</p>
+      <div><a class="btn btn-primary" href="{{ url_for('matching') }}">Find a horse</a></div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,6 +1,7 @@
 """Horse Tinder Flask application."""
 
 import os
+import random
 import re
 import secrets
 import sqlite3
@@ -78,6 +79,11 @@ SAMPLE_HORSES = (
     (48, "Button", "Miniature Horse", 8, "Pocket-sized adventures", None),
     (49, "Regal", "Friesian", 17, "Gentle dressage, grooming", None),
     (50, "Huckleberry", "Clydesdale", 4, "Meadow walks, crunchy snacks", None),
+)
+HORSE_WORDS = (
+    "neigh", "whinny", "snort", "nicker", "nickers", "huff", "hrrr",
+    "clip-clop", "hoofbeats", "squeal", "nuzzle", "flicka", "prrr",
+    "whuffle", "stomp", "munch", "hay", "bray", "snuffle",
 )
 
 app = Flask(__name__)
@@ -434,6 +440,8 @@ def save_swipe():
             )
             if cursor.rowcount == 0:
                 abort(404)
+            if decision == "right":
+                _get_or_create_chat(connection, session["user_id"], profile_id)
     except sqlite3.IntegrityError:
         # A repeated submission is harmless; the unique key preserves the first choice.
         flash("You have already swiped on that profile.", "info")
@@ -445,32 +453,191 @@ def save_swipe():
     ))
 
 
-@app.get("/checkpoint4/profile/<int:profile_id>")
+@app.get("/profile/<int:profile_id>")
 @login_required
 def matched_profile_placeholder(profile_id):
-    """Provide a destination until read-only matched profiles arrive in checkpoint 4."""
+    """Show another profile without allowing edits."""
     with get_db() as connection:
-        profile = connection.execute(
-            "SELECT profiledata.name, logindata.username FROM profiledata LEFT JOIN logindata USING (user_id) WHERE profile_id = ?",
-            (profile_id,),
-        ).fetchone()
+        profile = _profile_detail(connection, profile_id)
     if profile is None:
         abort(404)
-    return render_template("coming_soon.html", feature=f"{profile['name'] or profile['username'] or 'Profile'}'s profile")
+    if profile["user_id"] == session["user_id"]:
+        return redirect(url_for("profile"))
+    return render_template("other_profile.html", profile=profile)
 
 
 @app.get("/checkpoint4/chat/<int:profile_id>")
 @login_required
 def matched_profile_chat_placeholder(profile_id):
-    """Provide a destination until matched-profile chats arrive in checkpoint 4."""
+    """Keep old matching-page chat links pointed at the real conversation flow."""
     with get_db() as connection:
-        profile = connection.execute(
-            "SELECT profiledata.name, logindata.username FROM profiledata LEFT JOIN logindata USING (user_id) WHERE profile_id = ?",
-            (profile_id,),
-        ).fetchone()
-    if profile is None:
+        chat_id = _get_or_create_chat(connection, session["user_id"], profile_id)
+    return redirect(url_for("chat", chat_id=chat_id))
+
+
+def _profile_detail(connection, profile_id):
+    return connection.execute(
+        """SELECT profiledata.profile_id, profiledata.user_id, profiledata.name,
+                  profiledata.pfp, profiledata.breed, profiledata.age, profiledata.interests,
+                  COALESCE(profiledata.name, logindata.username, 'Unnamed profile') AS display_name
+           FROM profiledata LEFT JOIN logindata USING (user_id)
+           WHERE profiledata.profile_id = ?""",
+        (profile_id,),
+    ).fetchone()
+
+
+def _get_or_create_chat(connection, user_id, other_profile_id):
+    """Create or reopen the persistent conversation between two profiles."""
+    own_profile = connection.execute(
+        "SELECT profile_id FROM profiledata WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    other = _profile_detail(connection, other_profile_id)
+    if own_profile is None or other is None or other_profile_id == own_profile["profile_id"]:
         abort(404)
-    return render_template("coming_soon.html", feature=f"Chat with {profile['name'] or profile['username'] or 'this profile'}")
+    own_profile_id = own_profile["profile_id"]
+    profile_0, profile_1 = sorted((own_profile_id, other_profile_id))
+    connection.execute(
+        "INSERT OR IGNORE INTO chats (profile_id_0, profile_id_1) VALUES (?, ?)",
+        (profile_0, profile_1),
+    )
+    chat_id = connection.execute(
+        "SELECT chat_id FROM chats WHERE profile_id_0 = ? AND profile_id_1 = ?",
+        (profile_0, profile_1),
+    ).fetchone()["chat_id"]
+    participant_ids = connection.execute(
+        "SELECT user_id FROM profiledata WHERE profile_id IN (?, ?) AND user_id IS NOT NULL",
+        (profile_0, profile_1),
+    ).fetchall()
+    for participant in participant_ids:
+        connection.execute(
+            "INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)",
+            (chat_id, participant["user_id"]),
+        )
+    connection.execute(
+        "UPDATE chat_participants SET deleted_at = NULL WHERE chat_id = ? AND user_id = ?",
+        (chat_id, user_id),
+    )
+    return chat_id
+
+
+@app.get("/chats")
+@login_required
+def chats():
+    """List conversations, optionally searching the profile and message text."""
+    search = request.args.get("q", "").strip()[:100]
+    with get_db() as connection:
+        sql = """SELECT chats.chat_id, other.profile_id,
+                        COALESCE(other.name, other_login.username, 'Unnamed profile') AS display_name,
+                        other.pfp, other.seed_key,
+                        (SELECT body FROM chat_messages WHERE chat_id = chats.chat_id
+                         ORDER BY created_at DESC, message_id DESC LIMIT 1) AS last_message
+                 FROM chat_participants mine
+                 JOIN chats ON chats.chat_id = mine.chat_id
+                 JOIN profiledata own ON own.user_id = mine.user_id
+                 JOIN profiledata other ON other.profile_id = CASE
+                     WHEN chats.profile_id_0 = own.profile_id THEN chats.profile_id_1
+                     ELSE chats.profile_id_0 END
+                 LEFT JOIN logindata other_login ON other_login.user_id = other.user_id
+                 WHERE mine.user_id = ? AND mine.deleted_at IS NULL"""
+        values = [session["user_id"]]
+        if search:
+            pattern = f"%{search}%"
+            sql += """ AND (COALESCE(other.name, other_login.username, '') LIKE ?
+                      OR COALESCE(other.breed, '') LIKE ?
+                      OR EXISTS (SELECT 1 FROM chat_messages m WHERE m.chat_id = chats.chat_id AND m.body LIKE ?))"""
+            values.extend([pattern, pattern, pattern])
+        sql += " ORDER BY COALESCE((SELECT MAX(created_at) FROM chat_messages WHERE chat_id = chats.chat_id), chats.created_at) DESC, chats.chat_id DESC"
+        conversation_list = connection.execute(sql, values).fetchall()
+    return render_template("chats.html", chats=conversation_list, search=search)
+
+
+@app.post("/chats/with/<int:profile_id>")
+@login_required
+def start_chat(profile_id):
+    with get_db() as connection:
+        chat_id = _get_or_create_chat(connection, session["user_id"], profile_id)
+    return redirect(url_for("chat", chat_id=chat_id))
+
+
+@app.route("/chats/<int:chat_id>", methods=["GET", "POST"])
+@login_required
+def chat(chat_id):
+    user_id = session["user_id"]
+    with get_db() as connection:
+        participant = connection.execute(
+            """SELECT mine.deleted_at, own.profile_id AS own_profile_id,
+                      CASE WHEN c.profile_id_0 = own.profile_id THEN c.profile_id_1
+                           ELSE c.profile_id_0 END AS other_profile_id
+               FROM chat_participants mine JOIN chats c ON c.chat_id = mine.chat_id
+               JOIN profiledata own ON own.user_id = mine.user_id
+               WHERE mine.chat_id = ? AND mine.user_id = ?""",
+            (chat_id, user_id),
+        ).fetchone()
+        if participant is None:
+            abort(404)
+        if participant["deleted_at"]:
+            connection.execute(
+                "UPDATE chat_participants SET deleted_at = NULL WHERE chat_id = ? AND user_id = ?",
+                (chat_id, user_id),
+            )
+        other_profile = _profile_detail(connection, participant["other_profile_id"])
+        if request.method == "POST":
+            body = request.form.get("body", "").strip()
+            if not body or len(body) > 2000:
+                flash("Messages must contain 1–2,000 characters.", "danger")
+            else:
+                connection.execute(
+                    "INSERT INTO chat_messages (chat_id, sender_profile_id, body) VALUES (?, ?, ?)",
+                    (chat_id, participant["own_profile_id"], body),
+                )
+                if other_profile["user_id"] is None:
+                    reply = " ".join(random.choices(HORSE_WORDS, k=random.randint(3, 7))) + "."
+                    connection.execute(
+                        "INSERT INTO chat_messages (chat_id, sender_profile_id, body) VALUES (?, ?, ?)",
+                        (chat_id, other_profile["profile_id"], reply),
+                    )
+                else:
+                    return redirect(url_for("chat", chat_id=chat_id))
+            return redirect(url_for("chat", chat_id=chat_id))
+        messages = connection.execute(
+            """SELECT chat_messages.body, chat_messages.created_at,
+                      chat_messages.sender_profile_id, sender.user_id AS sender_user_id
+               FROM chat_messages JOIN profiledata sender
+                 ON sender.profile_id = chat_messages.sender_profile_id
+               WHERE chat_messages.chat_id = ?
+               ORDER BY chat_messages.created_at, chat_messages.message_id""",
+            (chat_id,),
+        ).fetchall()
+    return render_template("chat.html", chat_id=chat_id, profile=other_profile,
+                           messages=messages, own_profile_id=participant["own_profile_id"])
+
+
+@app.post("/chats/<int:chat_id>/delete")
+@login_required
+def delete_chat(chat_id):
+    with get_db() as connection:
+        participant = connection.execute(
+            "SELECT deleted_at FROM chat_participants WHERE chat_id = ? AND user_id = ?",
+            (chat_id, session["user_id"]),
+        ).fetchone()
+        if participant is None:
+            abort(404)
+        connection.execute(
+            "UPDATE chat_participants SET deleted_at = CURRENT_TIMESTAMP WHERE chat_id = ? AND user_id = ?",
+            (chat_id, session["user_id"]),
+        )
+        remaining = connection.execute(
+            "SELECT COUNT(*) FROM chat_participants WHERE chat_id = ? AND deleted_at IS NULL",
+            (chat_id,),
+        ).fetchone()[0]
+        # A seeded profile acts as having deleted its side when its user deletes.
+        participant_count = connection.execute(
+            "SELECT COUNT(*) FROM chat_participants WHERE chat_id = ?", (chat_id,)
+        ).fetchone()[0]
+        if (participant_count == 1) or remaining == 0:
+            connection.execute("DELETE FROM chats WHERE chat_id = ?", (chat_id,))
+    flash("Chat deleted from your list.", "info")
+    return redirect(url_for("chats"))
 
 
 @app.get("/dependencies")

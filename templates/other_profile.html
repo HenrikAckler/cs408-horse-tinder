@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ profile['display_name'] }} | Horse Tinder{% endblock %}
+{% block content %}
+<section class="page-card card border-0 shadow-sm">
+  {% if profile['pfp'] %}
+    <img src="{{ profile['pfp'] }}" class="card-img-top" alt="{{ profile['display_name'] }}" style="max-height:360px;object-fit:cover">
+  {% else %}
+    <div class="d-flex align-items-center justify-content-center bg-light text-secondary" style="height:220px;font-size:5rem" aria-label="No photo available">♞</div>
+  {% endif %}
+  <div class="card-body p-4 p-md-5">
+    <h1 class="h2">{{ profile['display_name'] }}</h1>
+    <p class="text-secondary">{{ profile['breed'] or 'Breed not specified' }} · {{ profile['age'] if profile['age'] is not none else 'Age not specified' }}{% if profile['age'] is not none %} years old{% endif %}</p>
+    <p><strong>Interests:</strong> {{ profile['interests'] or 'Not specified' }}</p>
+    <form method="post" action="{{ url_for('start_chat', profile_id=profile['profile_id']) }}" class="d-flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-primary">Start chat</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('matching') }}">Back to matching</a>
+    </form>
+  </div>
+</section>
+{% endblock %}
