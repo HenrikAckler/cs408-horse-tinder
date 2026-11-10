@@ -1,6 +1,6 @@
 # Horse Tinder
 
-A Flask and Jinja Horse Tinder application. Checkpoint 3 includes account registration, login/logout, editable personal profiles, and a matching page with sample profiles, filters, and saved left/right swipes. `/dependencies` reports whether the selected frontend libraries are available.
+A Flask and Jinja Horse Tinder application. The app includes account registration, login/logout, editable personal profiles, matching with sample profiles, filters and saved left/right swipes, chats, and a scrollable feed of 100 seeded horse posts. `/dependencies` reports whether the selected frontend libraries are available.
 
 ## Local setup
 
@@ -27,6 +27,8 @@ SQLite creates and updates the tables automatically when the app starts. The def
 ## Matching
 
 After signing up or logging in, open **Matching** to browse all other profiles, including the 50 sample profiles and other registered users. All profiles use the same fields; breed and picture are up to users to interpret. Filter by breed and optional minimum/maximum age, then swipe left to pass or right to like. You can also use the **Pass** and **Like** buttons. Horizontal gestures use the lightweight Hammer.js library, with Alpine.js connecting the gesture to the existing form. Decisions are saved to SQLite and that profile is removed from your deck for that account. Right-swiping any profile creates or restores its chat. Clearing filters does not clear swipes. Open a read-only profile and choose **Start chat** to create or continue a conversation. Chats are available from the navigation bar, support search by profile, breed, and message text, and can be hidden with **Delete**. For a chat between two real accounts, its messages are removed after both participants delete the chat. Seeded horse profiles reply with a randomly assembled sentence of horse noises; deleting one of those chats hides it from your list, while opening the profile again restores the conversation.
+
+Open **Feed** to scroll through 100 sample posts written in horse voices, newest first. Search matches post titles, text, and horse names. Fourteen posts use distinct bundled Unsplash photos; the remaining posts are text-only. The feed is seeded idempotently when the app initializes. Image source links are recorded in `static/images/feed/README.md`.
 
 The sample profile records are defined in `app.py` and seeded idempotently when the app initializes. The local database was reset for the unified profile schema; create a new account the next time you use the app. See [`docs/checkpoint3.md`](docs/checkpoint3.md) for implementation notes and database details.
 

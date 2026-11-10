@@ -61,5 +61,20 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     FOREIGN KEY (sender_profile_id) REFERENCES profiledata(profile_id) ON DELETE CASCADE
 );
 
+-- Feed authors reuse profiledata, so sample horses and account holders share one shape.
+CREATE TABLE IF NOT EXISTS feed_posts (
+    post_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    image_path TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    seed_key TEXT UNIQUE,
+    FOREIGN KEY (profile_id) REFERENCES profiledata(profile_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS feed_posts_created
+    ON feed_posts(created_at DESC, post_id DESC);
+
 CREATE INDEX IF NOT EXISTS chat_messages_chat_created
     ON chat_messages(chat_id, created_at, message_id);

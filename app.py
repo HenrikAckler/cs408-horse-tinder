@@ -22,12 +22,26 @@ from flask import (
 )
 from flask_bcrypt import Bcrypt
 from flask_wtf.csrf import CSRFProtect
+from feed_seed import SAMPLE_POSTS
 
 ROOT = Path(__file__).resolve().parent
 DATABASE = Path(os.environ.get("HORSE_TINDER_DATABASE", ROOT / "instance/horse_tinder.db"))
 SCHEMA = ROOT / "schema.sql"
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
 MAX_PASSWORD_BYTES = 72  # bcrypt's portable input limit
+# Pick one seeded-random post in each time slice, so photos span the feed.
+_image_rng = random.Random(408)
+FEED_IMAGE_POST_NUMBERS = tuple(sorted(
+    _image_rng.randint(
+        bucket * len(SAMPLE_POSTS) // 14 + 1,
+        (bucket + 1) * len(SAMPLE_POSTS) // 14,
+    )
+    for bucket in range(14)
+))
+FEED_IMAGE_NUMBER_BY_POST = {
+    post_number: image_number
+    for image_number, post_number in enumerate(FEED_IMAGE_POST_NUMBERS, start=1)
+}
 SAMPLE_HORSES = (
     (1, "Muffin", "Shetland Pony", 8, "Carrots, small jumps, naps", None),
     (2, "Dusty", "Quarter Horse", 11, "Trail rides, sunny fields", None),
@@ -136,7 +150,7 @@ def get_db():
 
 
 def initialize_database():
-    """Create tables and idempotently add the sample profiles."""
+    """Create tables and idempotently add sample profiles and feed posts."""
     DATABASE.parent.mkdir(parents=True, exist_ok=True)
     with get_db() as connection:
         connection.executescript(SCHEMA.read_text(encoding="utf-8"))
@@ -149,6 +163,30 @@ def initialize_database():
                 for sample_id, name, breed, age, interests, pfp in SAMPLE_HORSES
             ],
         )
+        # Reuse the sample profiles as post authors; no separate fake accounts needed.
+        for post_number, (title, body) in enumerate(SAMPLE_POSTS, start=1):
+            author_number = ((post_number - 1) % len(SAMPLE_HORSES)) + 1
+            # Give each photo to one post only; the rest of the feed stays text-only.
+            image_number = FEED_IMAGE_NUMBER_BY_POST.get(post_number)
+            image_path = f"images/feed/horse-{image_number:02d}.jpg" if image_number else None
+            # Newer posts get smaller offsets, giving the feed a believable timeline.
+            days_ago = len(SAMPLE_POSTS) - post_number
+            connection.execute(
+                """INSERT OR IGNORE INTO feed_posts
+                   (profile_id, title, body, image_path, created_at, seed_key)
+                   SELECT profile_id, ?, ?, ?, datetime('now', ?), ?
+                   FROM profiledata WHERE seed_key = ?""",
+                (
+                    title, body, image_path, f"-{days_ago} days",
+                    f"sample-post-{post_number:03d}",
+                    f"sample-profile-{author_number:02d}",
+                ),
+            )
+            # Refresh image paths for existing seeded posts when the image set changes.
+            connection.execute(
+                "UPDATE feed_posts SET image_path = ? WHERE seed_key = ?",
+                (image_path, f"sample-post-{post_number:03d}"),
+            )
 
 
 def get_user_by_id(user_id):
@@ -197,6 +235,28 @@ def inject_current_user():
 def index():
     """Render the public landing page."""
     return render_template("index.html")
+
+
+@app.get("/feed")
+@login_required
+def feed():
+    """Show and search the seeded horse posts, newest first."""
+    search = request.args.get("q", "").strip()[:100]
+    with get_db() as connection:
+        sql = """SELECT feed_posts.title, feed_posts.body, feed_posts.image_path,
+                      feed_posts.created_at,
+                      COALESCE(profiledata.name, logindata.username, 'Unnamed horse') AS author
+               FROM feed_posts
+               JOIN profiledata USING (profile_id)
+               LEFT JOIN logindata USING (user_id)"""
+        values = []
+        if search:
+            sql += " WHERE feed_posts.title LIKE ? OR feed_posts.body LIKE ? OR COALESCE(profiledata.name, logindata.username, '') LIKE ?"
+            pattern = f"%{search}%"
+            values.extend((pattern, pattern, pattern))
+        sql += " ORDER BY feed_posts.created_at DESC, feed_posts.post_id DESC"
+        posts = connection.execute(sql, values).fetchall()
+    return render_template("feed.html", posts=posts, search=search)
 
 
 @app.get("/register")
